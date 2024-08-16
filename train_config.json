@@ -1,0 +1,10 @@
+{
+    "path_to_train": "data/Menpo_68p/train/",
+    "path_to_val": "data/Menpo_68p/val/",
+    "batch_size": "32",
+    "output_path": "300",
+    "learning_rate": "0.03",
+    "epochs": "10",
+    "weights_directory": "test_weights.pth",
+    "model_directory": "test_model.pth"
+}
