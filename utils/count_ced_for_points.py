@@ -53,7 +53,7 @@ def read_faces(dir_path: str) -> dict:
         if idx % 100 == 0:
             print(f'Read {idx}, currently reading {fname}')
 
-        if cur_path.endswith('.jpg'):
+        if cur_path.endswith(('.jpg', '.png')):
 
             img = io.imread(cur_path)
             dets, scores, id = detector.run(img, 1, -1)
@@ -114,8 +114,12 @@ def count_ced(predicted_points, gt_points, args, face_bbox=None):
                     normalization_factor = np.sqrt(h * w)
 
                 elif args.normalization_type == 'face_dlib':
-                    h, w = face_bbox[img_name]
-                    normalization_factor = np.sqrt(h * w)
+                    try:
+                        h, w = face_bbox[img_name]
+                        normalization_factor = np.sqrt(h * w)
+                    except KeyError:
+                        print(
+                            f'Face {img_name} was skipped during ced calculations')
 
                 else:
                     raise Exception('Wrong normalization type')
@@ -164,6 +168,8 @@ def main():
     parser.add_argument('--gt_path', action='store', type=str, help='')
     parser.add_argument('--predictions_path',
                         action='append', type=str, help='')
+    parser.add_argument('--dlib_pred_path', action='store',
+                        type=str, help='', default=None)
     parser.add_argument('--output_path', action='store', type=str, help='')
     parser.add_argument('--left_eye_idx', action='store', type=str, help='')
     parser.add_argument('--right_eye_idx', action='store', type=str, help='')
@@ -183,6 +189,11 @@ def main():
         predicted_points[os.path.basename(pred_path)] = read_points(
             pred_path, args.max_points_to_read)
     gt_points = read_points(args.gt_path, args.max_points_to_read)
+    if not (args.dlib_pred_path is None):
+        dlib_points = {}
+        for pred_path in args.predictions_path:
+            dlib_points[os.path.basename(pred_path)] = read_points(
+                args.dlib_pred_path, args.max_points_to_read)
 
     if args.normalization_type == 'face_dlib':
         faces = read_faces(args.gt_path)
@@ -190,8 +201,13 @@ def main():
     # print(gt_points)
     if args.normalization_type == 'face_dlib':
         ceds = count_ced(predicted_points, gt_points, args, face_bbox=faces)
+        if not (args.dlib_pred_path is None):
+            ceds_dlib = count_ced(dlib_points, gt_points,
+                                  args, face_bbox=faces)
     else:
         ceds = count_ced(predicted_points, gt_points, args)
+        if not (args.dlib_pred_path is None):
+            ceds_dlib = count_ced(dlib_points, gt_points, args)
 
     # saving figure
     line_styles = [':', '-.', '--', '-']
@@ -199,15 +215,26 @@ def main():
     for method_idx, method_name in enumerate(ceds.keys()):
         print('Plotting graph for the method {}'.format(method_name))
         err = ceds[method_name]
+        err_dlib = ceds_dlib[method_name]
         proportion = np.arange(err.shape[0], dtype=np.float32) / err.shape[0]
+        proportion_dlib = np.arange(
+            err_dlib.shape[0], dtype=np.float32) / err_dlib.shape[0]
         under_thr = err > args.error_thr
+        under_thr_dlib = err_dlib > args.error_thr
         last_idx = len(err)
+        last_idx_dlib = len(err_dlib)
         if len(np.flatnonzero(under_thr)) > 0:
             last_idx = np.flatnonzero(under_thr)[0]
+        if len(np.flatnonzero(under_thr_dlib)) > 0:
+            last_idx_dlib = np.flatnonzero(under_thr_dlib)[0]
         under_thr_range = range(last_idx)
+        under_thr_range_dlib = range(last_idx_dlib)
         cur_auc = count_ced_auc(err)[0]
+        cur_auc_dlib = count_ced_auc(err_dlib)[0]
 
-        plt.plot(err[under_thr_range], proportion[under_thr_range], label=method_name + ', auc={:1.3f}'.format(cur_auc),
+        plt.plot(err[under_thr_range], proportion[under_thr_range], color='g', label=method_name + ', auc={:1.3f}'.format(cur_auc),
+                 linestyle=line_styles[method_idx % len(line_styles)], linewidth=2.0)
+        plt.plot(err_dlib[under_thr_range_dlib], proportion_dlib[under_thr_range_dlib], color='r', label='dlib predictions',
                  linestyle=line_styles[method_idx % len(line_styles)], linewidth=2.0)
     plt.legend(loc='right', prop={'size': 24})
     plt.savefig(args.output_path)
