@@ -25,6 +25,10 @@
 
 Конфиг файл для скрипта test.py
 
+# requirements.txt
+
+файл с pip freeze, содержащий все используемые библиотеки
+
 ## папка src
 
 ### src/model.py
