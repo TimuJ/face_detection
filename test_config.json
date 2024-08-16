@@ -1,0 +1,5 @@
+{
+    "path_to_weights": "test_weights.pth",
+    "test_dir": "data/Menpo_68p/test",
+    "output_dir": "data/Menpo_68p/preds/resnet18_test/"
+}
